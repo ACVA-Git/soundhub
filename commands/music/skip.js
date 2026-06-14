@@ -30,25 +30,31 @@ async function skipTrack({ client, interaction }) {
             return interaction.reply({ embeds: [embed], ephemeral: true });
         }
         
-        const currentTrack = player.queue.current; // Get the current song being played
-        const nextTrack = player.queue.tracks[0]; // Get the next song in the queue
-        
+        const currentTrack = player.queue.current;
+        const nextTrack = player.queue.tracks[0];
+
         if (!nextTrack) {
             const embed = noSongToSkipEmbed
-            return interaction.reply({embeds: [embed]});
+            return interaction.reply({embeds: [embed], ephemeral: true});
         }
 
+        // For button interactions, respond immediately (like stop button)
+        if (interaction.isButton()) {
+            const skipQueue = 1; // Buttons always skip 1
+            await interaction.deferReply({ ephemeral: true });
+            await player.skip(skipQueue);
+            const embed = skipTrackEmbed(currentTrack);
+            return interaction.editReply({ embeds: [embed] });
+        }
+
+        // For slash commands, use defer/editReply pattern
         await interaction.deferReply();
-        
-        // Skip the song
+
         const skipQueue = interaction.options?.getInteger("skip_queue") || 1;
         await player.skip(skipQueue);
-        
-        // Create the embed using skipTrackEmbed
-        const embed = skipTrackEmbed(currentTrack);
 
-        // Send the embed message
-        await interaction.followUp({ embeds: [embed] });
+        const embed = skipTrackEmbed(currentTrack);
+        await interaction.editReply({ embeds: [embed] });
     } catch (error) {
         console.error(error);
         const embed = processingErrorEmbed();

@@ -9,7 +9,7 @@ function createNowPlayingEmbed(currentTrack, player, hexColor, attachment) {
     return new EmbedBuilder()
         .setColor(hexColor) // Use the converted hex color for the embed
         .setDescription(`🔊・Now Playing **${currentTrack.info.title} - ${currentTrack.info.author}**`)
-        .setImage('attachment://now-playing.png')
+//      .setImage('attachment://now-playing.png')
         .setFooter({ text: `Requested by ${player.queue.current.requester.displayName}` });
 }
 
@@ -64,4 +64,4 @@ function createNowPlaying(currentTrack, player, hexColor, attachment) {
     return { embed, components, files: [attachment] };
 }
 
-module.exports = { createNowPlaying };
+module.exports = { createNowPlayingEmbed, createNowPlayingComponents, createNowPlaying };

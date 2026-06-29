@@ -24,12 +24,15 @@ module.exports = {
     async execute({ client, interaction }) {
         if (!interaction.guildId) return;
 
+        // Defer reply immediately to avoid timeout
+        await interaction.deferReply();
+
         const query = interaction.options.getString("query");
         const voiceChannel = interaction.member?.voice.channel;
 
         if (!voiceChannel) {
             const embed = joinVoiceChannelEmbed();
-            return interaction.reply({ embeds: [embed], ephemeral: true });
+            return interaction.editReply({ embeds: [embed], ephemeral: true });
         }
 
         const player = client.lavalink.getPlayer(interaction.guild.id) || await client.lavalink.createPlayer({
@@ -43,40 +46,45 @@ module.exports = {
 
         if (!player.connected) await player.connect();
 
-        const response = await player.search({ query, source: "ytmsearch" }, interaction.user);
+        // --- Intelligent Source Detection ---
+        let searchSource;
+        if (query.includes("spotify.com/playlist") || query.includes("spotify.com/track") || query.includes("spotify.com/album")) {
+            searchSource = "spotify";
+        } else if (query.includes("youtube.com/playlist") || query.includes("youtu.be/")) {
+            searchSource = "youtube";
+        } else {
+            searchSource = "ytsearch"; // Default fallback for general queries
+        }
+
+        const response = await player.search({ query, source: searchSource }, interaction.user);
 
         if (!response || !response.tracks.length) {
             const embed = noTracksFoundEmbed(query);
-            return interaction.reply({ embeds: [embed], ephemeral: true });
+            return interaction.editReply({ embeds: [embed], ephemeral: true });
         }
 
-        const track = response.tracks[0];
-        player.queue.add(track);
+        if (response.loadType === 'playlist') {
+            player.queue.add(response.tracks);
 
-        if (!player.playing) {
-            await player.play();
-        }
-
-        const currentTrack = player.queue.current;
-        if (!currentTrack) {
-            const embed = noSongPlayingEmbed();
-            return interaction.reply({ embeds: [embed], ephemeral: true });
-        }
-
-        const queue = player.queue.tracks;
-
-        try {
-            if (queue.length > 0) {
-                const embed = addedToQueueEmbed(track, queue.length);
-                await interaction.reply({ embeds: [embed] });
-            } else {
-                await interaction.deferReply();
-                const embed = startedPlayingEmbed(track);
-                await interaction.editReply({ embeds: [embed] });
+            if (!player.playing && !player.paused) {
+                await player.play();
             }
-        } catch (error) {
-            console.error('Error handling interaction:', error);
-            await interaction.reply({ content: 'An error occurred while processing your request.', ephemeral: true });
+
+            const playlistName = response.playlistInfo?.name || 'Unknown Playlist';
+            const embed = addedToQueueEmbed(playlistName, response.tracks.length);
+            await interaction.editReply({ embeds: [embed] });
+
+        } else {
+            const track = response.tracks[0];
+
+            player.queue.add(track);
+
+            if (!player.playing && !player.paused) {
+                await player.play();
+            }
+
+            const embed = addedToQueueEmbed(track, player.queue.tracks.length);
+            await interaction.editReply({ embeds: [embed] });
         }
     }
 };

@@ -51,7 +51,7 @@ class Bot {
         this.client.lavalink = new LavalinkManager({
             nodes: lavaLinkConfig.nodes,
             sendToShard: (guildId, payload) => this.client.guilds.cache.get(guildId)?.shard?.send(payload),
-            autoSkip: true,
+            autoSkip: true, // Let Lavalink handle auto-skipping
             client: {
                 id: botConfig.clientId,
                 username: "Soundhub",
@@ -111,7 +111,16 @@ class Bot {
                     await command.execute({ client: this.client, interaction });
                 } catch (err) {
                     console.error("Error executing command:", err);
-                    await interaction.reply("❌ An error occurred while executing that command");
+                    // Try to reply with error, but don't crash if we can't
+                    try {
+                        if (!interaction.replied && !interaction.deferred) {
+                            await interaction.reply({ content: "❌ An error occurred while executing that command", ephemeral: true });
+                        } else {
+                            await interaction.editReply({ content: "❌ An error occurred while executing that command" });
+                        }
+                    } catch (replyError) {
+                        console.error("Could not send error message to user:", replyError.message);
+                    }
                 }
             } else if (interaction.isButton()) {
                 // Handle button interactions
@@ -119,7 +128,12 @@ class Bot {
                     await this.handleButtonInteraction(interaction);
                 } catch (err) {
                     console.error("Error handling button interaction:", err);
-                    await interaction.reply("❌ An error occurred while handling the button interaction");
+                    // Try to reply with error, but don't crash if we can't
+                    try {
+                        await interaction.reply({ content: "❌ An error occurred while handling the button interaction", ephemeral: true });
+                    } catch (replyError) {
+                        console.error("Could not send button error message to user:", replyError.message);
+                    }
                 }
             }
         });
@@ -151,6 +165,7 @@ class Bot {
             case 'stop':
                 // Handle stop button
                 if (player) {
+                    player.queue.tracks = [];  // Clear queue before destroying
                     player.destroy();
                     await interaction.reply({ content: "Why you bully me? :c", ephemeral: true });
                 } else {

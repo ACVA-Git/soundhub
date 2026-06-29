@@ -63,26 +63,31 @@ module.exports = {
                     message = player.filterManager.filters.lowPass
                         ? "The LowPass filter has been activated."
                         : "The LowPass filter has been disabled.";
+                    break;
                 case "vaporwave":
                     await player.filterManager.toggleVaporwave();
                     message = player.filterManager.filters.vaporwave
                         ? "The Vaporwave filter has been activated."
                         : "The Vaporwave filter has been disabled.";
+                    break;
                 case "rotation":
                     await player.filterManager.toggleRotation();
                     message = player.filterManager.filters.rotation
                         ? "The Rotation filter has been activated."
                         : "The Rotation filter has been disabled.";
+                    break;
                 case "tremolo":
                     await player.filterManager.toggleTermolo();
                     message = player.filterManager.filters.termolo
                         ? "The Termolo filter has been activated."
-                        : "The Termolo filter has been disabled.";
+                        : "The Tremolo filter has been disabled.";
+                    break;
                 case "vibrato":
                     await player.filterManager.toggleVibrato();
                     message = player.filterManager.filters.vibrato
                         ? "The Vibrato filter has been activated."
                         : "The Vibrato filter has been disabled.";
+                    break;
                 default:
                     message = "N/A";
                     break;

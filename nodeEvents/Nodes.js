@@ -15,6 +15,10 @@ function NodesEvents(client) {
         // Log a message when a node is attempting to reconnect
         console.log(`[NODES] -> Reconnecting`);
     })
+    // Handle node errors to prevent ERR_UNHANDLED_ERROR crashes
+    .on('error', (node, error) => {
+        console.error(`[NODES] -> Error on node ${node?.options?.id || 'unknown'}:`, error?.message || error);
+    })
 }
 
 // Export the NodesEvents function to use it elsewhere in the project

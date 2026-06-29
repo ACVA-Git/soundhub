@@ -55,31 +55,31 @@ async function createNowPlayingImage(currentTrack) {
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     // Load and draw thumbnail
-    const thumbnailUrl = currentTrack.info.artworkUrl || 'https://example.com/default-thumbnail.png';
-    const thumbnail = await loadImage(thumbnailUrl);
-    const thumbnailX = 20;
-    const thumbnailY = 20;
-    const thumbnailSize = 210;
+ //   const thumbnailUrl = currentTrack.info.artworkUrl || 'https://example.com/default-thumbnail.png';
+ //   const thumbnail = await loadImage(thumbnailUrl);
+ //   const thumbnailX = 20;
+ //   const thumbnailY = 20;
+ //   const thumbnailSize = 210;
 
     // Get the average color of the thumbnail
-    const glowColor = await getAverageColor(thumbnail);
+ //   const glowColor = await getAverageColor(thumbnail);
 
     // Configure shadow for the glow effect
-    ctx.save(); // Save the current state of the canvas
-    ctx.shadowBlur = 20; // Adjust this value for more/less blur
-    ctx.shadowColor = glowColor; // Color of the glow
-    ctx.shadowOffsetX = 0; // No horizontal offset
-    ctx.shadowOffsetY = 0; // No vertical offset
-    ctx.drawImage(thumbnail, thumbnailX, thumbnailY, thumbnailSize, thumbnailSize); // Draw the thumbnail
-    ctx.restore(); // Restore the previous state to prevent the shadow from affecting other drawings
+ //   ctx.save(); // Save the current state of the canvas
+ //   ctx.shadowBlur = 20; // Adjust this value for more/less blur
+ //   ctx.shadowColor = glowColor; // Color of the glow
+ //   ctx.shadowOffsetX = 0; // No horizontal offset
+ //   ctx.shadowOffsetY = 0; // No vertical offset
+ //   ctx.drawImage(thumbnail, thumbnailX, thumbnailY, thumbnailSize, thumbnailSize); // Draw the thumbnail
+ //   ctx.restore(); // Restore the previous state to prevent the shadow from affecting other drawings
 
     // Draw song title and author
     ctx.fillStyle = 'white';
     ctx.font = '30px "JetBrains Mono", sans-serif';
-    ctx.fillText(currentTrack.info.title, 290, 100);
-    ctx.fillStyle = 'gray';
+    ctx.fillText('Playing Music...', 20, 100);
     ctx.font = '22px "JetBrains Mono", sans-serif';
-    ctx.fillText(currentTrack.info.author || 'Unknown Author', 290, 140);
+    ctx.fillText(`${currentTrack.info.title}`, 20, 140);
+    ctx.fillText(`${currentTrack.info.author || 'Unknown Author'}`, 20, 170);
 
     const imageBuffer = canvas.toBuffer();
     cache[trackId] = imageBuffer;

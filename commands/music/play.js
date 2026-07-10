@@ -32,7 +32,7 @@ module.exports = {
 
         if (!voiceChannel) {
             const embed = joinVoiceChannelEmbed();
-            return interaction.editReply({ embeds: [embed], ephemeral: true });
+            return interaction.editReply({ embeds: [embed] });
         }
 
         const player = client.lavalink.getPlayer(interaction.guild.id) || await client.lavalink.createPlayer({
@@ -60,7 +60,7 @@ module.exports = {
 
         if (!response || !response.tracks.length) {
             const embed = noTracksFoundEmbed(query);
-            return interaction.editReply({ embeds: [embed], ephemeral: true });
+            return interaction.editReply({ embeds: [embed] });
         }
 
         if (response.loadType === 'playlist') {

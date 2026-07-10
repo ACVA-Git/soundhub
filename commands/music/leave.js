@@ -1,4 +1,5 @@
 const { SlashCommandBuilder } = require("discord.js");
+const { safeInteractionError } = require('../../utils/interactions');
 const { joinVoiceChannelEmbed, sameVoiceChannelEmbed, botNotConnectedEmbed, noSongPlayingEmbed, processingErrorEmbed } = require("../../utils/embeds");
 const { successfullyLeftChannelEmbed } = require("../../utils/embeds/leave");
 
@@ -17,24 +18,24 @@ module.exports = {
 
             if (!voiceChannel) {
                 const embed = joinVoiceChannelEmbed();
-                return interaction.editReply({ embeds: [embed], ephemeral: true});
+                return interaction.editReply({ embeds: [embed]});
             }
 
             const player = client.lavalink.getPlayer(interaction.guildId);
 
             if (!player) {
                 const embed = botNotConnectedEmbed();
-                return interaction.editReply({ embeds: [embed], ephemeral: true});
+                return interaction.editReply({ embeds: [embed]});
             }
 
             if (player.voiceChannelId !== voiceChannel) {
                 const embed = sameVoiceChannelEmbed();
-                return interaction.editReply({ embeds: [embed], ephemeral: true});
+                return interaction.editReply({ embeds: [embed]});
             }
 
             if (!player.queue.current) {
                 const embed = noSongPlayingEmbed();
-                return interaction.editReply({ embeds: [embed], ephemeral: true});
+                return interaction.editReply({ embeds: [embed]});
             }
 
             await player.destroy();
@@ -45,7 +46,7 @@ module.exports = {
         } catch (error) {
             console.error(error);
             const embed = processingErrorEmbed();
-            return interaction.editReply({ embeds: [embed], ephemeral: true});
+            return safeInteractionError(interaction, { embeds: [embed] });
         }
     }
 };

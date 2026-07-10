@@ -1,4 +1,5 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { EPHEMERAL_FLAG } = require('../../utils/interactions');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -21,6 +22,6 @@ module.exports = {
             .setFooter({ text: 'Thank you for using our bot!', iconURL: client.user.displayAvatarURL() })
             .setTimestamp();
 
-        await interaction.reply({ embeds: [embed], ephemeral: true });
+        await interaction.reply({ embeds: [embed], flags: EPHEMERAL_FLAG });
     },
 };

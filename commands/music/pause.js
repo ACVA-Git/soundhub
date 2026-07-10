@@ -1,4 +1,5 @@
 const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require("discord.js");
+const { EPHEMERAL_FLAG, safeInteractionError } = require('../../utils/interactions');
 const {
     joinVoiceChannelEmbed,
     botNotConnectedEmbed,
@@ -65,26 +66,26 @@ async function pauseTrack({ client, interaction }) {
         if (interaction.isButton()) {
             if (!voiceChannel) {
                 const embed = joinVoiceChannelEmbed()
-                return interaction.reply({embeds: [embed], ephemeral: true});
+                return interaction.reply({embeds: [embed], flags: EPHEMERAL_FLAG});
             }
 
             if (!player) {
                 const embed = botNotConnectedEmbed()
-                return interaction.reply({embeds:[embed], ephemeral: true});
+                return interaction.reply({embeds:[embed], flags: EPHEMERAL_FLAG});
             }
 
             if (player.voiceChannelId !== voiceChannel) {
                 const embed = sameVoiceChannelEmbed()
-                return interaction.reply({embeds:[embed], ephemeral: true});
+                return interaction.reply({embeds:[embed], flags: EPHEMERAL_FLAG});
             }
 
             if (!player.queue.current) {
                 const embed = noSongPlayingEmbed()
-                return interaction.reply({embeds:[embed], ephemeral: true});
+                return interaction.reply({embeds:[embed], flags: EPHEMERAL_FLAG});
             }
 
             if (!player.paused) {
-                await interaction.deferReply({ ephemeral: true });
+                await interaction.deferReply({ flags: EPHEMERAL_FLAG });
                 await player.pause();
                 const embed = pausedPlayingEmbed();
                 const components = createMusicButtons(player.queue.current);
@@ -92,12 +93,12 @@ async function pauseTrack({ client, interaction }) {
             } else {
                 const embed = alreadyPausedEmbed();
                 const components = createMusicButtons(player.queue.current);
-                return interaction.reply({embeds:[embed], components, ephemeral: true});
+                return interaction.reply({embeds:[embed], components, flags: EPHEMERAL_FLAG});
             }
         }
 
         // For slash commands, use defer/editReply pattern
-        await interaction.deferReply({ephemeral:true});
+        await interaction.deferReply({flags: EPHEMERAL_FLAG});
 
         if (!voiceChannel) {
             const embed = joinVoiceChannelEmbed()
@@ -138,7 +139,7 @@ async function pauseTrack({ client, interaction }) {
     } catch (error) {
         console.error(error);
         const embed = processingErrorEmbed()
-        return interaction.editReply({embeds:[embed]});
+        return safeInteractionError(interaction, {embeds:[embed]});
     }
 }
 

@@ -4,6 +4,7 @@ const {
   ButtonBuilder,
   ButtonStyle
 } = require("discord.js");
+const { EPHEMERAL_FLAG, safeInteractionError } = require('../../utils/interactions');
 
 async function displayQueue({ client, interaction }) {
   try {
@@ -15,15 +16,15 @@ async function displayQueue({ client, interaction }) {
     // For button interactions, validate and respond immediately (like stop button)
     if (interaction.isButton()) {
       if (!player) {
-        return interaction.reply({ content: "There is no queue.", ephemeral: true });
+        return interaction.reply({ content: "There is no queue.", flags: EPHEMERAL_FLAG });
       }
 
       if (player.voiceChannelId !== voiceChannel) {
-        return interaction.reply({ content: "You must be in the same voice channel as the bot.", ephemeral: true });
+        return interaction.reply({ content: "You must be in the same voice channel as the bot.", flags: EPHEMERAL_FLAG });
       }
 
       if (!player.queue || !player.queue.current) {
-        return interaction.reply({ content: "There are no songs playing right now.", ephemeral: true });
+        return interaction.reply({ content: "There are no songs playing right now.", flags: EPHEMERAL_FLAG });
       }
 
       const currentTrack = player.queue.current;
@@ -67,11 +68,11 @@ async function displayQueue({ client, interaction }) {
             .setStyle(ButtonStyle.Primary)
         );
 
-      return interaction.reply({ embeds: [embed], components: [row], ephemeral: true });
+      return interaction.reply({ embeds: [embed], components: [row], flags: EPHEMERAL_FLAG });
     }
 
     // For slash commands, use defer/editReply pattern
-    await interaction.deferReply({ephemeral: true});
+    await interaction.deferReply({flags: EPHEMERAL_FLAG});
 
     if (!player) {
       return interaction.editReply("There is no queue.");
@@ -132,9 +133,9 @@ async function displayQueue({ client, interaction }) {
     await interaction.editReply({ embeds: [embed], components: [row] });
   } catch (error) {
     console.error(error);
-    return interaction.editReply(
-      "An error occurred while processing the command."
-    );
+    return safeInteractionError(interaction, {
+      content: "An error occurred while processing the command."
+    });
   }
 }
 

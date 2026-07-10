@@ -1,4 +1,5 @@
 const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
+const { EPHEMERAL_FLAG, safeInteractionError } = require('../../utils/interactions');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -20,7 +21,7 @@ module.exports = {
             if (!interaction.guildId) return;
 
             // Defer the reply to allow time for processing the command
-            await interaction.deferReply({ ephemeral: true });
+            await interaction.deferReply({ flags: EPHEMERAL_FLAG });
 
             // Get the voice channel the user is in
             const voiceChannel = interaction.member.voice.channelId;
@@ -58,7 +59,7 @@ module.exports = {
             // Log any errors that occur during the command execution
             console.error(error);
             // Send a generic error message to the user
-            return interaction.editReply("An error occurred while processing the command.");
+            return safeInteractionError(interaction, { content: "An error occurred while processing the command." });
         }
     }
 };

@@ -10,7 +10,8 @@ const {
     Client,
     GatewayIntentBits,
     Collection,
-    REST
+    REST,
+    Events,
 } = require("discord.js");
 const { Routes } = require("discord-api-types/v10");
 
@@ -27,6 +28,11 @@ const NodesEvents = require("./nodeEvents/Nodes");
 
 // Utility functions
 const { getAllFiles } = require("./utils/fileHelper")
+const {
+    getVoiceControlError,
+    replyEphemeral,
+    safeInteractionError,
+} = require("./utils/interactions");
 
 // Commands
 const { skipTrack } = require("./commands/music/skip");
@@ -95,15 +101,15 @@ class Bot {
         this.client.on("raw", d => this.client.lavalink.sendRawData(d));
 
         // Ready event
-        this.client.on("ready", () => {
+        this.client.once(Events.ClientReady, readyClient => {
             this.registerCommands();
-            console.log(`Logged in as ${this.client.user.tag}!`);
-            this.client.lavalink.init(this.client.user);
+            console.log(`Logged in as ${readyClient.user.tag}!`);
+            this.client.lavalink.init(readyClient.user);
         });
 
         // Interaction event
         this.client.on("interactionCreate", async interaction => {
-            if (interaction.isCommand()) {
+            if (interaction.isChatInputCommand()) {
                 const command = this.client.commands.get(interaction.commandName);
                 if (!command) return;
 
@@ -111,16 +117,9 @@ class Bot {
                     await command.execute({ client: this.client, interaction });
                 } catch (err) {
                     console.error("Error executing command:", err);
-                    // Try to reply with error, but don't crash if we can't
-                    try {
-                        if (!interaction.replied && !interaction.deferred) {
-                            await interaction.reply({ content: "❌ An error occurred while executing that command", ephemeral: true });
-                        } else {
-                            await interaction.editReply({ content: "❌ An error occurred while executing that command" });
-                        }
-                    } catch (replyError) {
-                        console.error("Could not send error message to user:", replyError.message);
-                    }
+                    await safeInteractionError(interaction, {
+                        content: "❌ An error occurred while executing that command",
+                    });
                 }
             } else if (interaction.isButton()) {
                 // Handle button interactions
@@ -128,12 +127,9 @@ class Bot {
                     await this.handleButtonInteraction(interaction);
                 } catch (err) {
                     console.error("Error handling button interaction:", err);
-                    // Try to reply with error, but don't crash if we can't
-                    try {
-                        await interaction.reply({ content: "❌ An error occurred while handling the button interaction", ephemeral: true });
-                    } catch (replyError) {
-                        console.error("Could not send button error message to user:", replyError.message);
-                    }
+                    await safeInteractionError(interaction, {
+                        content: "❌ An error occurred while handling the button interaction",
+                    });
                 }
             }
         });
@@ -148,6 +144,18 @@ class Bot {
         const customId = interaction.customId;
         const guildId = interaction.guildId;
         const player = this.client.lavalink.players.get(guildId);
+        const mutatingControls = new Set([
+            'stop',
+            'volume_up',
+            'volume_down',
+            'clear_queue',
+            'shuffle_queue',
+        ]);
+
+        if (mutatingControls.has(customId)) {
+            const controlError = getVoiceControlError(interaction, player);
+            if (controlError) return replyEphemeral(interaction, controlError);
+        }
 
         switch (customId) {
             case 'resume':
@@ -164,55 +172,45 @@ class Bot {
                 break;
             case 'stop':
                 // Handle stop button
-                if (player) {
-                    player.queue.tracks = [];  // Clear queue before destroying
-                    player.destroy();
-                    await interaction.reply({ content: "Why you bully me? :c", ephemeral: true });
-                } else {
-                    await interaction.reply({ content: "No player found!", ephemeral: true });
-                }
+                player.queue.tracks = [];  // Clear queue before destroying
+                await player.destroy();
+                await replyEphemeral(interaction, "Why you bully me? :c");
                 break;
             case 'queue':
                 //Handle queue button
                 await displayQueue({ client: this.client, interaction })
                 break;
             case 'volume_up':
-                if (player) {
-                    let currentVolume = player.volume;
+                {
+                    const currentVolume = player.volume;
                     if (currentVolume < 100) {
-                        player.setVolume(currentVolume + 10);
-                        await interaction.reply({ content: `Volume increased to ${currentVolume + 10}%`, ephemeral: true });
+                        const nextVolume = Math.min(100, currentVolume + 10);
+                        await player.setVolume(nextVolume);
+                        await replyEphemeral(interaction, `Volume increased to ${nextVolume}%`);
                     } else {
-                        await interaction.reply({ content: "Volume is already at maximum!", ephemeral: true });
+                        await replyEphemeral(interaction, "Volume is already at maximum!");
                     }
-                } else {
-                    await interaction.reply({ content: "No player found!", ephemeral: true });
                 }
                 break;
             case 'volume_down':
-                if (player) {
-                    let currentVolume = player.volume;
+                {
+                    const currentVolume = player.volume;
                     if (currentVolume > 0) {
-                        player.setVolume(currentVolume - 10);
-                        await interaction.reply({ content: `Volume decreased to ${currentVolume - 10}%`, ephemeral: true });
+                        const nextVolume = Math.max(0, currentVolume - 10);
+                        await player.setVolume(nextVolume);
+                        await replyEphemeral(interaction, `Volume decreased to ${nextVolume}%`);
                     } else {
-                        await interaction.reply({ content: "Volume is already at minimum!", ephemeral: true });
+                        await replyEphemeral(interaction, "Volume is already at minimum!");
                     }
-                } else {
-                    await interaction.reply({ content: "No player found!", ephemeral: true });
                 }
                 break;
             case 'clear_queue':
-                if (player) {
-                    player.queue.tracks = [];
-                    await interaction.reply({ content: "The queue has been cleared!", ephemeral: true });
-                } else {
-                    await interaction.reply({ content: "No player found!", ephemeral: true });
-                }
+                player.queue.tracks = [];
+                await replyEphemeral(interaction, "The queue has been cleared!");
                 break;
             case 'shuffle_queue':
                 // Handle shuffle queue button
-                if (player) {
+                {
                     const tracks = player.queue.tracks;
                     if (tracks.length > 0) {
                         // Shuffle the tracks in the queue
@@ -220,16 +218,14 @@ class Bot {
                             const j = Math.floor(Math.random() * (i + 1));
                             [tracks[i], tracks[j]] = [tracks[j], tracks[i]]; // Swap tracks
                         }
-                        await interaction.reply({ content: "The queue has been shuffled!", ephemeral: true });
+                        await replyEphemeral(interaction, "The queue has been shuffled!");
                     } else {
-                        await interaction.reply({ content: "There are no tracks in the queue to shuffle.", ephemeral: true });
+                        await replyEphemeral(interaction, "There are no tracks in the queue to shuffle.");
                     }
-                } else {
-                    await interaction.reply({ content: "No player found!", ephemeral: true });
                 }
                 break;
             default:
-                await interaction.reply({ content: 'Unknown button clicked!', ephemeral: true });
+                await replyEphemeral(interaction, 'Unknown button clicked!');
                 break;
         }
     }

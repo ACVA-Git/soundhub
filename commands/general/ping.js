@@ -1,4 +1,5 @@
 const { SlashCommandBuilder } = require("discord.js");
+const { EPHEMERAL_FLAG } = require('../../utils/interactions');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -8,7 +9,7 @@ module.exports = {
         // Responder al usuario
         await interaction.reply({
             content: "Pong! 🏓",
-            ephemeral: true,
+            flags: EPHEMERAL_FLAG,
         });
     },
 };

@@ -3,9 +3,12 @@
   "version": "2.0.0",
   "description": "Music Bot for Discord",
   "main": "index.js",
-  "engines": {},
+  "engines": {
+    "node": ">=22.12.0 <27"
+  },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node index.js",
+    "test": "node --test"
   },
   "author": "Obskurath",
   "license": "MIT",
@@ -13,12 +16,19 @@
     "NekoSakuraLucia (NekoMoew)"
   ],
   "dependencies": {
-    "@discordjs/builders": "^1.9.0",
-    "canvas": "^2.11.2",
-    "discord-api-types": "^0.37.107",
-    "discord.js": "^14.16.3",
-    "dotenv": "^16.4.5",
-    "lavalink-client": "^2.9.7",
-    "nodemon": "^3.1.7"
+    "@discordjs/builders": "^1.14.1",
+    "canvas": "^3.2.3",
+    "discord-api-types": "^0.38.49",
+    "discord.js": "^14.26.4",
+    "dotenv": "^17.4.2",
+    "lavalink-client": "^2.10.3"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.14"
+  },
+  "overrides": {
+    "lodash": "^4.18.1",
+    "picomatch": "^2.3.2",
+    "undici": "6.27.0"
   }
 }

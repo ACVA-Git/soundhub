@@ -1,5 +1,6 @@
 const { createNowPlaying } = require('../utils/embeds/play/createNowPlaying');
 const { AttachmentBuilder, EmbedBuilder } = require('discord.js');
+const { refillRadio, stopRadio } = require('../utils/radio');
 
 function rgbToHex(rgb) {
     const [r, g, b] = rgb.match(/\d+/g).map(Number);
@@ -20,6 +21,11 @@ function PlayerEvents(client) {
             idleTimers.delete(player.guildId);
             console.log(`[Auto-Disconnect] Cleared idle timer for guild ${player.guildId}`);
         }
+
+        // Keep radio sessions supplied before the listener reaches the end of
+        // the current short queue. A failure is logged inside refillRadio and
+        // never prevents ordinary playback or now-playing updates.
+        await refillRadio(player);
 
         const currentTrack = player.queue.current;
         if (!currentTrack) return;
@@ -223,6 +229,7 @@ function PlayerEvents(client) {
     })
     .on('queueEnd', async (player) => {
         console.log(`[Queue Ended] -> Guilds ${player.guildId}`);
+        stopRadio(player.guildId);
 
         const channel = client.channels.cache.get(player.textChannelId);
         const currentMessageId = nowPlayingMessages.get(player.guildId);

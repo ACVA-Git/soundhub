@@ -25,6 +25,8 @@
 | `/stop`    | Stop playing               |
 | `/skip`    | Skip track                 |
 | `/queue`   | View queue                 |
+| `/radio start` | Start an auto-refilled similar-track radio from a Spotify track URL |
+| `/radio stop` | Stop automatic radio refills |
 | `/leave`   | Leave Channel              |
 | `/loop`    | Repeat Song                |
 | `/volume`  | Adjust the music volume    |

@@ -184,7 +184,7 @@ module.exports = {
             await player.queue.add(playbackTrack);
             await player.queue.add(remainingTracks);
 
-            const playlistName = response.playlistInfo?.name || 'Unknown Playlist';
+            const playlistName = response.playlist?.name || response.playlist?.title || response.playlistInfo?.name || 'Unknown Playlist';
             const embed = addedToQueueEmbed(playlistName, response.tracks.length);
             await interaction.editReply({ content: '', embeds: [embed] });
 

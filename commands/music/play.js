@@ -80,6 +80,20 @@ async function resolveTracksForPlayback(player, tracks, requester) {
     return resolved;
 }
 
+function resolveQueuedPlaylistTracks(player, tracks, requester) {
+    void (async () => {
+        for (const track of tracks) {
+            try {
+                const resolvedTrack = await resolveCompanionTrack(player, track, requester);
+                const queueIndex = player.queue.tracks.findIndex((queuedTrack) => queuedTrack === track);
+                if (queueIndex >= 0) await player.queue.splice(queueIndex, 1, resolvedTrack);
+            } catch (error) {
+                console.warn(`[Companion] Background resolution failed for ${track?.info?.title}; keeping Lavalink fallback.`, error);
+            }
+        }
+    })().catch((error) => console.error('[Companion] Unexpected playlist resolver error:', error));
+}
+
 module.exports = {
     data: new SlashCommandBuilder()
         .setName("play")
@@ -132,20 +146,25 @@ module.exports = {
             return interaction.editReply({ embeds: [embed] });
         }
 
-        const playbackTracks = await resolveTracksForPlayback(player, response.tracks, interaction.user);
-
         if (response.loadType === 'playlist') {
-            player.queue.add(playbackTracks);
+            const [firstTrack, ...remainingTracks] = response.tracks;
+            const [playbackTrack] = await resolveTracksForPlayback(player, [firstTrack], interaction.user);
+
+            await player.queue.add(playbackTrack);
+            await player.queue.add(remainingTracks);
 
             if (!player.playing && !player.paused) {
                 await player.play();
             }
+
+            resolveQueuedPlaylistTracks(player, remainingTracks, interaction.user);
 
             const playlistName = response.playlistInfo?.name || 'Unknown Playlist';
             const embed = addedToQueueEmbed(playlistName, response.tracks.length);
             await interaction.editReply({ embeds: [embed] });
 
         } else {
+            const playbackTracks = await resolveTracksForPlayback(player, response.tracks, interaction.user);
             const track = playbackTracks[0];
 
             player.queue.add(track);

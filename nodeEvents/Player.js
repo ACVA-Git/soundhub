@@ -7,6 +7,41 @@ function rgbToHex(rgb) {
     return `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1).toUpperCase()}`;
 }
 
+async function queueCompanionFallback(client, player, track) {
+    const apiToken = process.env.COMPANION_API_TOKEN;
+    if (!apiToken) throw new Error('COMPANION_API_TOKEN is not configured');
+
+    const query = `${track?.info?.title || ''} ${track?.info?.author || ''}`.trim();
+    const search = await player.search({ query, source: 'ytmsearch' }, client.user);
+    const sourceTrack = search?.tracks?.find((candidate) =>
+        /^[A-Za-z0-9_-]{11}$/.test(candidate?.info?.identifier || '')
+    );
+    if (!sourceTrack) throw new Error(`No YouTube video ID found for ${query}`);
+
+    const response = await fetch('http://127.0.0.1:8282/companion/youtubei/v1/player', {
+        method: 'POST',
+        headers: {
+            Authorization: `Bearer ${apiToken}`,
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ videoId: sourceTrack.info.identifier }),
+    });
+    if (!response.ok) throw new Error(`Companion returned HTTP ${response.status}`);
+
+    const data = await response.json();
+    const audio = data?.streamingData?.adaptiveFormats?.find((format) =>
+        typeof format.url === 'string' && format.mimeType?.startsWith('audio/webm')
+    );
+    if (!audio?.url) throw new Error('Companion returned no playable Opus stream');
+
+    const direct = await player.search({ query: audio.url, source: 'http' }, client.user);
+    const fallbackTrack = direct?.tracks?.[0];
+    if (!fallbackTrack) throw new Error('Lavalink could not load the Companion stream');
+
+    player.queue.splice(player.queue.currentPosition + 1, 0, fallbackTrack);
+    return sourceTrack.info.title;
+}
+
 function PlayerEvents(client) {
     const nowPlayingMessages = new Map(); // Store message IDs per guild: guildId -> messageId
     const idleTimers = new Map(); // Store idle timers for each guild
@@ -141,6 +176,21 @@ function PlayerEvents(client) {
 
         const channel = client.channels.cache.get(player.textChannelId);
         if (!channel) return;
+
+        if (payload?.exception?.message?.includes('All clients failed to load the item')) {
+            try {
+                const title = await queueCompanionFallback(client, player, track);
+                await channel.send({
+                    embeds: [new EmbedBuilder()
+                        .setColor(0xFFA500)
+                        .setDescription(`⚠️ YouTube blocked the original stream. Retrying **${title}** through the local audio fallback.`)],
+                });
+                await player.skip();
+                return;
+            } catch (fallbackError) {
+                console.error(`[Track Error] Companion fallback failed for ${track?.info?.title}:`, fallbackError);
+            }
+        }
 
         if (payload?.exception?.message?.includes("This video is not available") || payload?.exception?.message?.includes("The uploader has not made this video available")) {
             console.log(`Attempting to find replacement for deleted video: ${track?.info?.title}`);

@@ -12,6 +12,8 @@ const {
 } = require('../../utils/embeds/index');
 
 const COMPANION_PLAYER_URL = 'http://127.0.0.1:8282/companion/youtubei/v1/player';
+const pendingPlaybackStarts = new Map();
+const PLAYLIST_RESOLUTION_CONCURRENCY = 4;
 
 function preserveSourceMetadata(directTrack, sourceTrack) {
     const directInfo = directTrack?.info || {};
@@ -81,8 +83,10 @@ async function resolveTracksForPlayback(player, tracks, requester) {
 }
 
 function resolveQueuedPlaylistTracks(player, tracks, requester) {
-    void (async () => {
-        for (const track of tracks) {
+    const pendingTracks = [...tracks];
+    const worker = async () => {
+        while (pendingTracks.length) {
+            const track = pendingTracks.shift();
             try {
                 const resolvedTrack = await resolveCompanionTrack(player, track, requester);
                 const queueIndex = player.queue.tracks.findIndex((queuedTrack) => queuedTrack === track);
@@ -91,7 +95,27 @@ function resolveQueuedPlaylistTracks(player, tracks, requester) {
                 console.warn(`[Companion] Background resolution failed for ${track?.info?.title}; keeping Lavalink fallback.`, error);
             }
         }
-    })().catch((error) => console.error('[Companion] Unexpected playlist resolver error:', error));
+    };
+
+    const workerCount = Math.min(PLAYLIST_RESOLUTION_CONCURRENCY, pendingTracks.length);
+    void Promise.all(Array.from({ length: workerCount }, worker)).catch((error) =>
+        console.error('[Companion] Unexpected playlist resolver error:', error)
+    );
+}
+
+function startPlayerIfIdle(player) {
+    if (player.playing || player.paused || pendingPlaybackStarts.has(player.guildId)) return;
+
+    const startPromise = (async () => {
+        try {
+            if (!player.playing && !player.paused) await player.play();
+        } finally {
+            setTimeout(() => pendingPlaybackStarts.delete(player.guildId), 10000);
+        }
+    })();
+
+    pendingPlaybackStarts.set(player.guildId, startPromise);
+    void startPromise.catch((error) => console.error('[Playback] Could not start player:', error));
 }
 
 module.exports = {
@@ -153,28 +177,23 @@ module.exports = {
             await player.queue.add(playbackTrack);
             await player.queue.add(remainingTracks);
 
-            if (!player.playing && !player.paused) {
-                await player.play();
-            }
-
-            resolveQueuedPlaylistTracks(player, remainingTracks, interaction.user);
-
             const playlistName = response.playlistInfo?.name || 'Unknown Playlist';
             const embed = addedToQueueEmbed(playlistName, response.tracks.length);
             await interaction.editReply({ embeds: [embed] });
+
+            startPlayerIfIdle(player);
+            resolveQueuedPlaylistTracks(player, remainingTracks, interaction.user);
 
         } else {
             const playbackTracks = await resolveTracksForPlayback(player, response.tracks, interaction.user);
             const track = playbackTracks[0];
 
-            player.queue.add(track);
-
-            if (!player.playing && !player.paused) {
-                await player.play();
-            }
+            await player.queue.add(track);
 
             const embed = addedToQueueEmbed(track, player.queue.tracks.length);
             await interaction.editReply({ embeds: [embed] });
+
+            startPlayerIfIdle(player);
         }
     }
 };

@@ -2,6 +2,9 @@ const { createNowPlaying } = require('../utils/embeds/play/createNowPlaying');
 const { AttachmentBuilder, EmbedBuilder } = require('discord.js');
 const { refillRadio, stopRadio } = require('../utils/radio');
 
+const failureAlerts = new Map();
+const FAILURE_ALERT_COOLDOWN_MS = 5 * 60 * 1000;
+
 function rgbToHex(rgb) {
     const [r, g, b] = rgb.match(/\d+/g).map(Number);
     return `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1).toUpperCase()}`;
@@ -40,6 +43,36 @@ async function queueCompanionFallback(client, player, track) {
 
     player.queue.splice(player.queue.currentPosition + 1, 0, fallbackTrack);
     return sourceTrack.info.title;
+}
+
+async function sendSongFailureAlert(client, player, track, error) {
+    const channelId = process.env.LOG_CHANNEL_ID;
+    if (!channelId) return;
+
+    const now = Date.now();
+    const lastAlert = failureAlerts.get(player.guildId) || 0;
+    if (now - lastAlert < FAILURE_ALERT_COOLDOWN_MS) return;
+    failureAlerts.set(player.guildId, now);
+
+    try {
+        const channel = await client.channels.fetch(channelId);
+        if (!channel?.isTextBased()) return;
+
+        await channel.send({
+            embeds: [new EmbedBuilder()
+                .setColor(0xFF0000)
+                .setTitle('Bussy song recovery failed')
+                .addFields(
+                    { name: 'Track', value: track?.info?.title || 'Unknown track' },
+                    { name: 'Artist', value: track?.info?.author || 'Unknown artist' },
+                    { name: 'Guild', value: player.guildId },
+                    { name: 'Reason', value: String(error?.message || error || 'Unknown error').slice(0, 1024) },
+                )
+                .setTimestamp()],
+        });
+    } catch (alertError) {
+        console.error('[Alerts] Could not send song failure alert:', alertError);
+    }
 }
 
 function PlayerEvents(client) {
@@ -189,6 +222,7 @@ function PlayerEvents(client) {
                 return;
             } catch (fallbackError) {
                 console.error(`[Track Error] Companion fallback failed for ${track?.info?.title}:`, fallbackError);
+                await sendSongFailureAlert(client, player, track, fallbackError);
             }
         }
 

@@ -13,6 +13,24 @@ const {
 
 const COMPANION_PLAYER_URL = 'http://127.0.0.1:8282/companion/youtubei/v1/player';
 
+function preserveSourceMetadata(directTrack, sourceTrack) {
+    const directInfo = directTrack?.info || {};
+    const sourceInfo = sourceTrack?.info || {};
+
+    return {
+        ...directTrack,
+        info: {
+            ...directInfo,
+            title: sourceInfo.title || directInfo.title,
+            author: sourceInfo.author || directInfo.author,
+            uri: sourceInfo.uri || directInfo.uri,
+            identifier: sourceInfo.identifier || directInfo.identifier,
+            artworkUrl: sourceInfo.artworkUrl || directInfo.artworkUrl,
+            length: sourceInfo.length || directInfo.length,
+        },
+    };
+}
+
 async function resolveCompanionTrack(player, track, requester) {
     let videoId = track?.info?.identifier;
 
@@ -46,7 +64,7 @@ async function resolveCompanionTrack(player, track, requester) {
     const direct = await player.search({ query: audio.url, source: 'http' }, requester);
     if (!direct?.tracks?.[0]) throw new Error('Lavalink could not load the Companion stream');
 
-    return direct.tracks[0];
+    return preserveSourceMetadata(direct.tracks[0], track);
 }
 
 async function resolveTracksForPlayback(player, tracks, requester) {

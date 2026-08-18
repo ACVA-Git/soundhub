@@ -11,6 +11,57 @@ const {
     startedPlayingEmbed
 } = require('../../utils/embeds/index');
 
+const COMPANION_PLAYER_URL = 'http://127.0.0.1:8282/companion/youtubei/v1/player';
+
+async function resolveCompanionTrack(player, track, requester) {
+    let videoId = track?.info?.identifier;
+
+    if (!/^[A-Za-z0-9_-]{11}$/.test(videoId || '')) {
+        const query = `${track?.info?.title || ''} ${track?.info?.author || ''}`.trim();
+        const search = await player.search({ query, source: 'ytmsearch' }, requester);
+        const match = search?.tracks?.find((candidate) =>
+            /^[A-Za-z0-9_-]{11}$/.test(candidate?.info?.identifier || '')
+        );
+        videoId = match?.info?.identifier;
+    }
+
+    if (!videoId) throw new Error(`No YouTube video ID found for ${track?.info?.title || 'track'}`);
+
+    const response = await fetch(COMPANION_PLAYER_URL, {
+        method: 'POST',
+        headers: {
+            Authorization: `Bearer ${process.env.COMPANION_API_TOKEN}`,
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ videoId }),
+    });
+    if (!response.ok) throw new Error(`Companion returned HTTP ${response.status}`);
+
+    const data = await response.json();
+    const audio = data?.streamingData?.adaptiveFormats?.find((format) =>
+        typeof format.url === 'string' && format.mimeType?.startsWith('audio/webm')
+    );
+    if (!audio?.url) throw new Error('Companion returned no playable Opus stream');
+
+    const direct = await player.search({ query: audio.url, source: 'http' }, requester);
+    if (!direct?.tracks?.[0]) throw new Error('Lavalink could not load the Companion stream');
+
+    return direct.tracks[0];
+}
+
+async function resolveTracksForPlayback(player, tracks, requester) {
+    const resolved = [];
+    for (const track of tracks) {
+        try {
+            resolved.push(await resolveCompanionTrack(player, track, requester));
+        } catch (error) {
+            console.warn(`[Companion] Primary resolution failed for ${track?.info?.title}; using Lavalink fallback.`, error);
+            resolved.push(track);
+        }
+    }
+    return resolved;
+}
+
 module.exports = {
     data: new SlashCommandBuilder()
         .setName("play")
@@ -63,8 +114,10 @@ module.exports = {
             return interaction.editReply({ embeds: [embed] });
         }
 
+        const playbackTracks = await resolveTracksForPlayback(player, response.tracks, interaction.user);
+
         if (response.loadType === 'playlist') {
-            player.queue.add(response.tracks);
+            player.queue.add(playbackTracks);
 
             if (!player.playing && !player.paused) {
                 await player.play();
@@ -75,7 +128,7 @@ module.exports = {
             await interaction.editReply({ embeds: [embed] });
 
         } else {
-            const track = response.tracks[0];
+            const track = playbackTracks[0];
 
             player.queue.add(track);
 

@@ -193,9 +193,9 @@ module.exports = {
             resolveQueuedPlaylistTracks(player, remainingTracks, interaction.user);
 
         } else {
-            const playbackTracks = await resolveTracksForPlayback(player, response.tracks, interaction.user);
+            // Search results contain many candidates; only the selected first result needs a stream.
+            const [track] = await resolveTracksForPlayback(player, [response.tracks[0]], interaction.user);
             logTiming('track-resolved');
-            const track = playbackTracks[0];
 
             await player.queue.add(track);
 

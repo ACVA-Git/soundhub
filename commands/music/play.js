@@ -131,15 +131,19 @@ module.exports = {
     async execute({ client, interaction }) {
         if (!interaction.guildId) return;
 
-        // Defer reply immediately to avoid timeout
+        // Acknowledge immediately so Discord never leaves the request on "thinking".
+        const requestStartedAt = performance.now();
+        const logTiming = (stage) => console.log(`[Play] guild=${interaction.guild.id} stage=${stage} elapsed_ms=${Math.round(performance.now() - requestStartedAt)}`);
         await interaction.deferReply();
+        await interaction.editReply({ content: '🔎 Finding a playable stream…' });
+        logTiming('acknowledged');
 
         const query = interaction.options.getString("query");
         const voiceChannel = interaction.member?.voice.channel;
 
         if (!voiceChannel) {
             const embed = joinVoiceChannelEmbed();
-            return interaction.editReply({ embeds: [embed] });
+            return interaction.editReply({ content: '', embeds: [embed] });
         }
 
         const player = client.lavalink.getPlayer(interaction.guild.id) || await client.lavalink.createPlayer({
@@ -152,6 +156,7 @@ module.exports = {
         });
 
         if (!player.connected) await player.connect();
+        logTiming('voice-connected');
 
         // --- Intelligent Source Detection ---
         let searchSource;
@@ -164,36 +169,41 @@ module.exports = {
         }
 
         const response = await player.search({ query, source: searchSource }, interaction.user);
+        logTiming('source-found');
 
         if (!response || !response.tracks.length) {
             const embed = noTracksFoundEmbed(query);
-            return interaction.editReply({ embeds: [embed] });
+            return interaction.editReply({ content: '', embeds: [embed] });
         }
 
         if (response.loadType === 'playlist') {
             const [firstTrack, ...remainingTracks] = response.tracks;
             const [playbackTrack] = await resolveTracksForPlayback(player, [firstTrack], interaction.user);
+            logTiming('first-track-resolved');
 
             await player.queue.add(playbackTrack);
             await player.queue.add(remainingTracks);
 
             const playlistName = response.playlistInfo?.name || 'Unknown Playlist';
             const embed = addedToQueueEmbed(playlistName, response.tracks.length);
-            await interaction.editReply({ embeds: [embed] });
+            await interaction.editReply({ content: '', embeds: [embed] });
 
             startPlayerIfIdle(player);
+            logTiming('queued');
             resolveQueuedPlaylistTracks(player, remainingTracks, interaction.user);
 
         } else {
             const playbackTracks = await resolveTracksForPlayback(player, response.tracks, interaction.user);
+            logTiming('track-resolved');
             const track = playbackTracks[0];
 
             await player.queue.add(track);
 
             const embed = addedToQueueEmbed(track, player.queue.tracks.length);
-            await interaction.editReply({ embeds: [embed] });
+            await interaction.editReply({ content: '', embeds: [embed] });
 
             startPlayerIfIdle(player);
+            logTiming('queued');
         }
     }
 };
